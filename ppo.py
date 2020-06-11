@@ -1,10 +1,10 @@
 import copy
 
 import numpy as np
-import torch as T
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from multiprocess_env import SubprocVecEnv
 from networks import ActorCriticCNN
 from torch import optim
@@ -22,7 +22,7 @@ class PPO:
         self.obs_space = self.envs.observation_space.shape
         action_space = self.envs.action_space.n
         self.model = ActorCriticCNN(self.obs_space, action_space)
-        self.device = 'cuda:0' if T.cuda.is_available() else 'cpu:0'
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu:0'
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
 
@@ -59,7 +59,7 @@ class PPO:
 
                 if score > best_score:
                     best_score = score
-                    T.save(self.model.state_dict(), 'model.pt')
+                    torch.save(self.model.state_dict(), 'model.pt')
                     print('saved best model with', end=' ')
 
                 self.writer.add_scalar('Score/50episodes', score, epoch+1)
@@ -73,16 +73,16 @@ class PPO:
 
 
     def _rollout(self):
-        states = T.zeros([self.n_steps+1, self.n_envs, *self.obs_space]).to(self.device)
+        states = torch.zeros([self.n_steps+1, self.n_envs, *self.obs_space]).to(self.device)
         masks = np.ones([self.n_steps+1, self.n_envs, 1], dtype=np.float32)
         rewards = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.float32)
         actions = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.int32)
         values = np.zeros([self.n_steps+1, self.n_envs, 1], dtype=np.float32)
 
-        states[0] = T.from_numpy(self.envs.reset())
+        states[0] = torch.from_numpy(self.envs.reset())
         masks[0] = 0.0
 
-        with T.no_grad():
+        with torch.no_grad():
             for t in range(self.n_steps):
                 _, vals, acts = self.model(states[t])
 
@@ -90,9 +90,10 @@ class PPO:
                 values[t] = vals.to('cpu').numpy()
                 states_np, rewards[t, :, 0], dones, _ = self.envs.step(actions[t])
                 masks[t][dones] = 0
-                states[t+1] = T.from_numpy(states_np)
+                states[t+1] = torch.from_numpy(states_np)
 
-            values[-1] = self.model.value(states[-1]).to('cpu').numpy()
+            _, last_val, _ = self.model(states[-1])
+            values[-1] = last_val.to('cpu').numpy()
             advantages = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.float32)
             
             returns = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.float32)
@@ -107,9 +108,9 @@ class PPO:
                 advantages[t] = gae
 
         states = states[:-1].view(-1, *self.obs_space)
-        actions = T.from_numpy(actions).long().view(-1, 1)
-        returns = T.from_numpy(returns).view(-1, 1)
-        advantages = T.from_numpy(advantages).view(-1, 1)
+        actions = torch.from_numpy(actions).long().view(-1, 1)
+        returns = torch.from_numpy(returns).view(-1, 1)
+        advantages = torch.from_numpy(advantages).view(-1, 1)
 
         del values
 
@@ -124,13 +125,13 @@ class PPO:
         losses = np.array([])
 
         for _ in range(self.ppo_epochs):
-            rand_list = T.randperm(self.batch_num*self.batch_size).view(-1, self.batch_size).tolist()
+            rand_list = torch.randperm(self.batch_num*self.batch_size).view(-1, self.batch_size).tolist()
 
             for ind in rand_list:
                 batch = states[ind]
                 actor_logits, vals, _ = self.model(batch)
                 log_probs = F.log_softmax(actor_logits, dim=1)
-                with T.no_grad():
+                with torch.no_grad():
                     old_actor_logits, _, _ = old_model(batch)
                     old_log_probs = F.log_softmax(old_actor_logits, dim=1)
 
@@ -145,7 +146,7 @@ class PPO:
                 r = (log_probs - old_log_probs).exp()
 
                 clip = r.clamp(min=1-self.epsilon, max=1+self.epsilon)
-                L, _ = T.stack([r * adv.detach(), clip * adv.detach()]).min(0)
+                L, _ = torch.stack([r * adv.detach(), clip * adv.detach()]).min(0)
                 v_l = A.pow(2).mean()
                 L = L.mean()
 
@@ -183,9 +184,9 @@ class PPO:
         total_reward = 0
 
         while not done:
-            state = T.FloatTensor(state).unsqueeze(0).to('cuda')
-            action = self.model.act(state).to('cpu')
-            next_state, reward, done, _ = self.env.step(action)
+            state = torch.FloatTensor(state).unsqueeze(0).to('cuda')
+            _, _, action = self.model(state)
+            next_state, reward, done, _ = self.env.step(action.to('cpu'))
 
             state = next_state
             total_reward += reward
@@ -194,14 +195,14 @@ class PPO:
 
     def eval(self, num_of_games):
         for _ in range(num_of_games):
-            self.model.load_state_dict(T.load('model.pt'))
+            self.model.load_state_dict(torch.load('model.pt'))
             self.model.eval()
 
             state = self.env.reset()
             done = False
 
             while not done:
-                state = T.FloatTensor(state).unsqueeze(0).to('cuda')
+                state = torch.FloatTensor(state).unsqueeze(0).to('cuda')
                 action = self.model.act(state).to('cpu')
                 self.env.render(mode='human')
                 state, _, done, _ = self.env.step(action)
