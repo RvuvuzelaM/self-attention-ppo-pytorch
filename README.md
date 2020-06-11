@@ -16,9 +16,16 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Tensorboard
+
+To run `tensorboard` use this command:
+```bash
+tensorboard --logdir runs
+```
+
 ## Lint
 
-To run `black` linter just run this command
+To lint code use this command:
 ```bash
 black .
 ```
@@ -26,7 +33,3 @@ black .
 ## Troubleshooting
 
 * (Ubuntu) During installation of `tensorboard` I encountered an error that required from me to install `python3-dev` package.
-
-### TODO:
-
-- Benchmark for other games and other algos

@@ -1,12 +1,11 @@
 import numpy as np
-
-import torch as T
+import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Normal
 
 
-class ActorCriticCNN(nn.Module):
+class ActorCriticNet(nn.Module):
     def __init__(self, shape, ac_s):
         super().__init__()
         self.c1 = nn.Conv2d(shape[0], 32, 8, stride=4)
@@ -41,7 +40,7 @@ class ActorCriticCNN(nn.Module):
         return actor_logits, values, acts
 
     def _get_conv_out(self, shape):
-        x = T.zeros(1, *shape)
+        x = torch.zeros(1, *shape)
         h = self.cnn_layer(x)
         return int(np.prod(h.size()))
 
@@ -72,7 +71,7 @@ class ScaledDotProductAttention(nn.Module):
         super().__init__()
 
     def forward(self, q, k, v):
-        attn = T.matmul(q, k.transpose(2, 3))
-        output = T.matmul(attn, v)
+        attn = torch.matmul(q, k.transpose(2, 3))
+        output = torch.matmul(attn, v)
 
         return output

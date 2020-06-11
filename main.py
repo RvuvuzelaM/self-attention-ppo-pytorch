@@ -1,7 +1,8 @@
 import time
 
-from ppo import PPO
 from torch.utils.tensorboard import SummaryWriter
+
+from src.ppo import PPO
 
 if __name__ == "__main__":
     ENV = "PongNoFrameskip-v4"
