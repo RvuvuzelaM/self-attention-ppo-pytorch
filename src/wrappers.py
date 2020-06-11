@@ -1,8 +1,31 @@
+import collections
+
 import cv2
 import gym
 import gym.spaces
 import numpy as np
-import collections
+
+
+def make_env_with_wrappers(env_name):
+    env = gym.make(env_name)
+
+    env = MaxAndSkipEnv(env)
+    env = FireResetEnv(env)
+
+    env = ProcessFrame84(env)
+    env = ScaledFloatFrame(env)
+    env = ImageToPyTorch(env)
+    env = BufferWrapper(env, 4)
+
+    return env
+
+
+def make_env_function(env_name):
+    def _thunk():
+        env = make_env_with_wrappers(env_name)
+        return env
+
+    return _thunk
 
 
 class FireResetEnv(gym.Wrapper):
@@ -79,21 +102,6 @@ class ProcessFrame84(gym.ObservationWrapper):
         return x_t.astype(np.uint8)
 
 
-class ImageToPyTorch(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(ImageToPyTorch, self).__init__(env)
-        old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(
-            low=0.0,
-            high=1.0,
-            shape=(old_shape[-1], old_shape[0], old_shape[1]),
-            dtype=np.float32,
-        )
-
-    def observation(self, observation):
-        return np.moveaxis(observation, 2, 0)
-
-
 class ScaledFloatFrame(gym.ObservationWrapper):
     def observation(self, obs):
         return np.array(obs).astype(np.float32) / 255.0
@@ -120,19 +128,16 @@ class BufferWrapper(gym.ObservationWrapper):
         return self.buffer
 
 
-def make_env_with_wrappers(env_name):
-    env = gym.make(env_name)
-    env = MaxAndSkipEnv(env)
-    env = FireResetEnv(env)
-    env = ProcessFrame84(env)
-    env = ImageToPyTorch(env)
-    env = BufferWrapper(env, 4)
-    return ScaledFloatFrame(env)
+class ImageToPyTorch(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(ImageToPyTorch, self).__init__(env)
+        old_shape = self.observation_space.shape
+        self.observation_space = gym.spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=(old_shape[-1], old_shape[0], old_shape[1]),
+            dtype=np.float32,
+        )
 
-
-def make_env_function(env_name):
-    def _thunk():
-        env = make_env_with_wrappers(env_name)
-        return env
-
-    return _thunk
+    def observation(self, observation):
+        return np.moveaxis(observation, 2, 0)

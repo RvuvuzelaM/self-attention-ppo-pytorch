@@ -1,15 +1,15 @@
 import copy
 
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from multiprocess_env import SubprocVecEnv
-from networks import ActorCriticCNN
 from torch import optim
 from torch.distributions import Categorical
-from wrappers import make_env_function, make_env_with_wrappers
+
+from .multiprocess import SubprocVecEnv
+from .model import ActorCriticNet
+from .wrappers import make_env_function, make_env_with_wrappers
 
 
 class PPO:
@@ -35,7 +35,7 @@ class PPO:
 
         self.obs_space = self.envs.observation_space.shape
         action_space = self.envs.action_space.n
-        self.model = ActorCriticCNN(self.obs_space, action_space)
+        self.model = ActorCriticNet(self.obs_space, action_space)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu:0"
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
@@ -68,7 +68,7 @@ class PPO:
 
             if (epoch + 1) % 10 == 0:
                 print("epoch:", epoch + 1, end=", ")
-                score = np.mean([self._test_env() for _ in range(25)])
+                score = np.mean([self._test_env() for _ in range(10)])
 
                 if score > best_score:
                     best_score = score

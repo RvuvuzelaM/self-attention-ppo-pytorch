@@ -32,8 +32,8 @@ def worker(remote, parent_remote, env_fn_wrapper):
 
 class VecEnv(object):
     """
-  An abstract asynchronous, vectorized environment.
-  """
+    An abstract asynchronous, vectorized environment.
+    """
 
     def __init__(self, num_envs, observation_space, action_space):
         self.num_envs = num_envs
@@ -41,41 +41,15 @@ class VecEnv(object):
         self.action_space = action_space
 
     def reset(self):
-        """
-    Reset all the environments and return an array of
-    observations, or a tuple of observation arrays.
-    If step_async is still doing work, that work will
-    be cancelled and step_wait() should not be called
-    until step_async() is invoked again.
-    """
         pass
 
     def step_async(self, actions):
-        """
-    Tell all the environments to start taking a step
-    with the given actions.
-    Call step_wait() to get the results of the step.
-    You should not call this if a step_async run is
-    already pending.
-    """
         pass
 
     def step_wait(self):
-        """
-    Wait for the step taken with step_async().
-    Returns (obs, rews, dones, infos):
-      - obs: an array of observations, or a tuple of
-            arrays of observations.
-      - rews: an array of rewards
-      - dones: an array of "episode done" booleans
-      - infos: a sequence of info objects
-    """
         pass
 
     def close(self):
-        """
-    Clean up the environments' resources.
-    """
         pass
 
     def step(self, actions):
@@ -85,8 +59,8 @@ class VecEnv(object):
 
 class CloudpickleWrapper(object):
     """
-  Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
-  """
+    Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
+    """
 
     def __init__(self, x):
         self.x = x
@@ -103,10 +77,11 @@ class CloudpickleWrapper(object):
 
 
 class SubprocVecEnv(VecEnv):
-    def __init__(self, env_fns, spaces=None):
-        """
+    """
     envs: list of gym environments to run in subprocesses
     """
+
+    def __init__(self, env_fns, spaces=None):
         self.waiting = False
         self.closed = False
         nenvs = len(env_fns)
