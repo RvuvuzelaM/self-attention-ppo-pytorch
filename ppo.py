@@ -13,16 +13,30 @@ from wrappers import make_env_function, make_env_with_wrappers
 
 
 class PPO:
-    def __init__(self, env_name, max_epochs, n_envs, n_steps, batch_size, writer,
-                epsilon=0.2, gamma=0.99, lambda_=0.95, v_loss_coef=0.5, 
-                entropy_coef=0.001, max_grad_norm=0.5, lr=0.004, ppo_epochs=4):
+    def __init__(
+        self,
+        env_name,
+        max_epochs,
+        n_envs,
+        n_steps,
+        batch_size,
+        writer,
+        epsilon=0.2,
+        gamma=0.99,
+        lambda_=0.95,
+        v_loss_coef=0.5,
+        entropy_coef=0.001,
+        max_grad_norm=0.5,
+        lr=0.004,
+        ppo_epochs=4,
+    ):
         self.envs = SubprocVecEnv([make_env_function(env_name) for _ in range(n_envs)])
         self.env = make_env_with_wrappers(env_name)
 
         self.obs_space = self.envs.observation_space.shape
         action_space = self.envs.action_space.n
         self.model = ActorCriticCNN(self.obs_space, action_space)
-        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu:0'
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu:0"
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
 
@@ -42,7 +56,6 @@ class PPO:
         self.max_grad_norm = max_grad_norm
         self.ppo_epochs = ppo_epochs
 
-
     def train(self):
         states, actions, rewards, advantages, returns, masks = self._rollout()
 
@@ -54,30 +67,31 @@ class PPO:
             states, actions, rewards, advantages, returns, masks = self._rollout()
 
             if (epoch + 1) % 10 == 0:
-                print('epoch:', epoch+1, end=', ')
+                print("epoch:", epoch + 1, end=", ")
                 score = np.mean([self._test_env() for _ in range(25)])
 
                 if score > best_score:
                     best_score = score
-                    torch.save(self.model.state_dict(), 'model.pt')
-                    print('saved best model with', end=' ')
+                    torch.save(self.model.state_dict(), "model.pt")
+                    print("saved best model with", end=" ")
 
-                self.writer.add_scalar('Score/50episodes', score, epoch+1)
-                print('score:', score)
+                self.writer.add_scalar("Score/50episodes", score, epoch + 1)
+                print("score:", score)
 
                 if best_score >= 20:
-                    print('Finished training!')
+                    print("Finished training!")
                     break
             else:
-                print('epoch:', epoch+1)
-
+                print("epoch:", epoch + 1)
 
     def _rollout(self):
-        states = torch.zeros([self.n_steps+1, self.n_envs, *self.obs_space]).to(self.device)
-        masks = np.ones([self.n_steps+1, self.n_envs, 1], dtype=np.float32)
+        states = torch.zeros([self.n_steps + 1, self.n_envs, *self.obs_space]).to(
+            self.device
+        )
+        masks = np.ones([self.n_steps + 1, self.n_envs, 1], dtype=np.float32)
         rewards = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.float32)
         actions = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.int32)
-        values = np.zeros([self.n_steps+1, self.n_envs, 1], dtype=np.float32)
+        values = np.zeros([self.n_steps + 1, self.n_envs, 1], dtype=np.float32)
 
         states[0] = torch.from_numpy(self.envs.reset())
         masks[0] = 0.0
@@ -86,24 +100,24 @@ class PPO:
             for t in range(self.n_steps):
                 _, vals, acts = self.model(states[t])
 
-                actions[t] = acts.to('cpu').numpy()
-                values[t] = vals.to('cpu').numpy()
+                actions[t] = acts.to("cpu").numpy()
+                values[t] = vals.to("cpu").numpy()
                 states_np, rewards[t, :, 0], dones, _ = self.envs.step(actions[t])
                 masks[t][dones] = 0
-                states[t+1] = torch.from_numpy(states_np)
+                states[t + 1] = torch.from_numpy(states_np)
 
             _, last_val, _ = self.model(states[-1])
-            values[-1] = last_val.to('cpu').numpy()
+            values[-1] = last_val.to("cpu").numpy()
             advantages = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.float32)
-            
+
             returns = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.float32)
             returns[-1] = rewards[-1] + self.gamma * masks[-1] * values[-1]
-            for t in reversed(range(self.n_steps-1)):
-                returns[t] = rewards[t] + self.gamma * masks[t+1] * returns[t+1]
+            for t in reversed(range(self.n_steps - 1)):
+                returns[t] = rewards[t] + self.gamma * masks[t + 1] * returns[t + 1]
 
             gae = 0
             for t in reversed(range(self.n_steps)):
-                delta = - values[t] + rewards[t]  + self.gamma * values[t+1]
+                delta = -values[t] + rewards[t] + self.gamma * values[t + 1]
                 gae = delta + self.gamma * self.lambda_ * masks[t] * gae
                 advantages[t] = gae
 
@@ -125,7 +139,11 @@ class PPO:
         losses = np.array([])
 
         for _ in range(self.ppo_epochs):
-            rand_list = torch.randperm(self.batch_num*self.batch_size).view(-1, self.batch_size).tolist()
+            rand_list = (
+                torch.randperm(self.batch_num * self.batch_size)
+                .view(-1, self.batch_size)
+                .tolist()
+            )
 
             for ind in rand_list:
                 batch = states[ind]
@@ -145,14 +163,14 @@ class PPO:
 
                 r = (log_probs - old_log_probs).exp()
 
-                clip = r.clamp(min=1-self.epsilon, max=1+self.epsilon)
+                clip = r.clamp(min=1 - self.epsilon, max=1 + self.epsilon)
                 L, _ = torch.stack([r * adv.detach(), clip * adv.detach()]).min(0)
                 v_l = A.pow(2).mean()
                 L = L.mean()
 
                 entropy = Categorical(F.softmax(actor_logits, dim=1)).entropy().mean()
 
-                loss = -L + self.v_loss_coef * v_l -self.entropy_coef * entropy
+                loss = -L + self.v_loss_coef * v_l - self.entropy_coef * entropy
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -163,19 +181,18 @@ class PPO:
                 value_losses = np.append(value_losses, v_l.cpu().detach().numpy())
                 losses = np.append(losses, loss.cpu().detach().numpy())
                 entropies = np.append(entropies, entropy.cpu().detach().numpy())
-        
+
         policy_loss = policy_losses.mean()
         value_loss = value_losses.mean()
         loss = losses.mean()
         entropy = entropies.mean()
 
-        self.writer.add_scalar('PolicyLoss', policy_loss, epoch+1)
-        self.writer.add_scalar('ValueLoss', value_loss, epoch+1)
-        self.writer.add_scalar('Loss', loss, epoch+1)
-        self.writer.add_scalar('Entropy', entropy, epoch+1)
+        self.writer.add_scalar("PolicyLoss", policy_loss, epoch + 1)
+        self.writer.add_scalar("ValueLoss", value_loss, epoch + 1)
+        self.writer.add_scalar("Loss", loss, epoch + 1)
+        self.writer.add_scalar("Entropy", entropy, epoch + 1)
 
         del states, actions, rewards, advantages, returns, masks
-
 
     def _test_env(self):
 
@@ -184,9 +201,9 @@ class PPO:
         total_reward = 0
 
         while not done:
-            state = torch.FloatTensor(state).unsqueeze(0).to('cuda')
+            state = torch.FloatTensor(state).unsqueeze(0).to("cuda")
             _, _, action = self.model(state)
-            next_state, reward, done, _ = self.env.step(action.to('cpu'))
+            next_state, reward, done, _ = self.env.step(action.to("cpu"))
 
             state = next_state
             total_reward += reward
@@ -195,14 +212,14 @@ class PPO:
 
     def eval(self, num_of_games):
         for _ in range(num_of_games):
-            self.model.load_state_dict(torch.load('model.pt'))
+            self.model.load_state_dict(torch.load("model.pt"))
             self.model.eval()
 
             state = self.env.reset()
             done = False
 
             while not done:
-                state = torch.FloatTensor(state).unsqueeze(0).to('cuda')
-                action = self.model.act(state).to('cpu')
-                self.env.render(mode='human')
+                state = torch.FloatTensor(state).unsqueeze(0).to("cuda")
+                action = self.model.act(state).to("cpu")
+                self.env.render(mode="human")
                 state, _, done, _ = self.env.step(action)

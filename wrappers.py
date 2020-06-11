@@ -9,7 +9,7 @@ class FireResetEnv(gym.Wrapper):
     def __init__(self, env=None):
         """For environments where the user need to press FIRE for the game to start."""
         super(FireResetEnv, self).__init__(env)
-        assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
+        assert env.unwrapped.get_action_meanings()[1] == "FIRE"
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
     def step(self, action):
@@ -57,7 +57,9 @@ class MaxAndSkipEnv(gym.Wrapper):
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(
+            low=0, high=255, shape=(84, 84, 1), dtype=np.uint8
+        )
 
     def observation(self, obs):
         return ProcessFrame84.process(obs)
@@ -81,8 +83,12 @@ class ImageToPyTorch(gym.ObservationWrapper):
     def __init__(self, env):
         super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]),
-                                                dtype=np.float32)
+        self.observation_space = gym.spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=(old_shape[-1], old_shape[0], old_shape[1]),
+            dtype=np.float32,
+        )
 
     def observation(self, observation):
         return np.moveaxis(observation, 2, 0)
@@ -98,8 +104,11 @@ class BufferWrapper(gym.ObservationWrapper):
         super(BufferWrapper, self).__init__(env)
         self.dtype = dtype
         old_space = env.observation_space
-        self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
-                                                old_space.high.repeat(n_steps, axis=0), dtype=dtype)
+        self.observation_space = gym.spaces.Box(
+            old_space.low.repeat(n_steps, axis=0),
+            old_space.high.repeat(n_steps, axis=0),
+            dtype=dtype,
+        )
 
     def reset(self):
         self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
@@ -120,8 +129,10 @@ def make_env_with_wrappers(env_name):
     env = BufferWrapper(env, 4)
     return ScaledFloatFrame(env)
 
+
 def make_env_function(env_name):
     def _thunk():
         env = make_env_with_wrappers(env_name)
         return env
+
     return _thunk

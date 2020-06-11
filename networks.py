@@ -19,7 +19,6 @@ class ActorCriticCNN(nn.Module):
         self.critic = nn.Linear(512, 1)
         self.actor = nn.Linear(512, ac_s)
 
-
     def cnn_layer(self, x):
         h = F.relu(self.c1(x))
         h = self.attention_layer(h, h, h)
@@ -27,13 +26,11 @@ class ActorCriticCNN(nn.Module):
         h = F.relu(self.c3(h))
         return h
 
-
     def shared_layer(self, x):
         h = self.cnn_layer(x)
         h = h.reshape(-1).view(-1, self.conv_out)
         h = F.relu(self.l1(h))
         return h
-
 
     def forward(self, x):
         h = self.shared_layer(x)
@@ -42,7 +39,6 @@ class ActorCriticCNN(nn.Module):
         prob = F.softmax(actor_logits, dim=-1)
         acts = prob.multinomial(1)
         return actor_logits, values, acts
-
 
     def _get_conv_out(self, shape):
         x = T.zeros(1, *shape)

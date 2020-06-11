@@ -16,6 +16,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Lint
+
+To run `black` linter just run this command
+```bash
+black .
+```
+
 ## Troubleshooting
 
 * (Ubuntu) During installation of `tensorboard` I encountered an error that required from me to install `python3-dev` package.
