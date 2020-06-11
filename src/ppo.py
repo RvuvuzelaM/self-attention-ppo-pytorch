@@ -68,7 +68,7 @@ class PPO:
 
             if (epoch + 1) % 10 == 0:
                 print("epoch:", epoch + 1, end=", ")
-                score = np.mean([self._test_env() for _ in range(5)])
+                score = np.mean([self._test_env() for _ in range(10)])
 
                 if score > best_score:
                     best_score = score
