@@ -1,7 +1,7 @@
+from multiprocessing import Pipe, Process
+
 import numpy as np
 
-from multiprocessing import Process, Pipe
-from PIL import Image
 
 def worker(remote, parent_remote, env_fn_wrapper):
   parent_remote.close()
@@ -13,12 +13,10 @@ def worker(remote, parent_remote, env_fn_wrapper):
       obs, reward, done, info = env.step(data)
       if done:
         obs = env.reset()
-      # obs = np.array(Image.fromarray(obs).resize((81, 81)))
       
       remote.send((obs, reward, done, info))
     elif cmd == 'reset':
       obs = env.reset()
-      # obs = np.array(Image.fromarray(obs).resize((81, 81)))
       remote.send(obs)
     elif cmd == 'reset_task':
       obs = env.reset_task()
