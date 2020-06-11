@@ -185,8 +185,8 @@ class PPO:
 
         while not done:
             state = torch.FloatTensor(state).unsqueeze(0).to('cuda')
-            action = self.model.act(state).to('cpu')
-            next_state, reward, done, _ = self.env.step(action)
+            _, _, action = self.model(state)
+            next_state, reward, done, _ = self.env.step(action.to('cpu'))
 
             state = next_state
             total_reward += reward
