@@ -5,6 +5,21 @@ I decided that it will be best to implement simplest one.
 
 This implementation don't have to be correct even though it works better than version without `Attention`.
 
+## Setup 
+
+```bash
+# Create and activate virtual environment.
+python3 -m venv venv
+# Install packages
+pip install -r requirements.txt
+# Run program
+python main.py
+```
+
+## Troubleshooting
+
+* (Ubuntu) During installation of `tensorboard` I encountered an error that required from me to install `python3-dev` package.
+
 ### TODO:
 
 - Benchmark for other games and other algos
