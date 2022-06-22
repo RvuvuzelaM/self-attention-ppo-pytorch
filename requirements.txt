@@ -17,7 +17,7 @@ idna==2.9
 importlib-metadata==1.6.1
 Markdown==3.2.2
 mccabe==0.6.1
-numpy==1.18.5
+numpy==1.22.0
 oauthlib==3.1.0
 opencv-python==4.2.0.34
 pathspec==0.8.0
