@@ -1,88 +1,38 @@
 import numpy as np
-import torch
-import torch.nn.functional as F
 from torch import nn
+from torch.distributions import Categorical
 
 
-class ActorCriticNet(nn.Module):
-    def __init__(self, shape, ac_s):
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    nn.init.orthogonal_(layer.weight, std)
+    nn.init.constant_(layer.bias, bias_const)
+    return layer
+
+
+class Agent(nn.Module):
+    def __init__(self, envs):
         super().__init__()
-        self.c1 = nn.Conv2d(shape[0], 32, 8, stride=4)
-        self.attention_layer = MultiHeadAttention(32)
-        self.c2 = nn.Conv2d(32, 64, 4, stride=2)
-        self.c3 = nn.Conv2d(64, 64, 3, stride=1)
-        self.conv_out = self._get_conv_out(shape)
+        self.network = nn.Sequential(
+            layer_init(nn.Conv2d(4, 32, 8, stride=4)),
+            nn.ReLU(),
+            layer_init(nn.Conv2d(32, 64, 4, stride=2)),
+            nn.ReLU(),
+            layer_init(nn.Conv2d(64, 64, 3, stride=1)),
+            nn.ReLU(),
+            nn.Flatten(),
+            layer_init(nn.Linear(64 * 7 * 7, 512)),
+            nn.ReLU(),
+        )
+        self.actor = layer_init(nn.Linear(512, envs.single_action_space.n), std=0.01)
+        self.critic = layer_init(nn.Linear(512, 1), std=1)
 
-        self.l1 = nn.Linear(self.conv_out, 512)
-        self.critic = nn.Linear(512, 1)
-        self.actor = nn.Linear(512, ac_s)
+    def get_value(self, x):
+        return self.critic(self.network(x / 255.0))
 
-        self._init_weights()
-
-    def _init_weights(self):
-        for module in [self.c1, self.c2, self.c3, self.l1]:
-            nn.init.orthogonal_(module.weight, gain=np.sqrt(2))
-            nn.init.constant_(module.bias, 0.0)
-        nn.init.orthogonal_(self.actor.weight, gain=0.01)
-        nn.init.constant_(self.actor.bias, 0.0)
-        nn.init.orthogonal_(self.critic.weight, gain=1.0)
-        nn.init.constant_(self.critic.bias, 0.0)
-
-    def cnn_layer(self, x):
-        h = F.relu(self.c1(x))
-        h = self.attention_layer(h, h, h)
-        h = F.relu(self.c2(h))
-        h = F.relu(self.c3(h))
-        return h
-
-    def shared_layer(self, x):
-        h = self.cnn_layer(x)
-        h = h.reshape(h.size(0), -1)
-        h = F.relu(self.l1(h))
-        return h
-
-    def forward(self, x):
-        h = self.shared_layer(x)
-        actor_logits = self.actor(h)
-        values = self.critic(h)
-        prob = F.softmax(actor_logits, dim=-1)
-        acts = prob.multinomial(1)
-        return actor_logits, values, acts
-
-    def _get_conv_out(self, shape):
-        x = torch.zeros(1, *shape)
-        h = self.cnn_layer(x)
-        return int(np.prod(h.size()))
-
-
-class MultiHeadAttention(nn.Module):
-    def __init__(self, size):
-        super().__init__()
-        self.w_qs = nn.Conv2d(size, size, 1)
-        self.w_ks = nn.Conv2d(size, size, 1)
-        self.w_vs = nn.Conv2d(size, size, 1)
-
-        self.attention = ScaledDotProductAttention()
-
-    def forward(self, q, k, v):
-        residual = q
-        q = self.w_qs(q).permute(0, 2, 3, 1)
-        k = self.w_ks(k).permute(0, 2, 3, 1)
-        v = self.w_vs(v).permute(0, 2, 3, 1)
-
-        attention = self.attention(q, k, v).permute(0, 3, 1, 2)
-
-        out = attention + residual
-        return out
-
-
-class ScaledDotProductAttention(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, q, k, v):
-        d_k = q.size(-1)
-        attn = torch.matmul(q, k.transpose(2, 3)) / (d_k**0.5)
-        attn = F.softmax(attn, dim=-1)
-        output = torch.matmul(attn, v)
-        return output
+    def get_action_and_value(self, x, action=None):
+        hidden = self.network(x / 255.0)
+        logits = self.actor(hidden)
+        probs = Categorical(logits=logits)
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), self.critic(hidden)

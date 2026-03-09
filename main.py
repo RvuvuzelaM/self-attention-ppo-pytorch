@@ -6,31 +6,38 @@ from src.ppo import PPO
 
 if __name__ == "__main__":
     ENV = "ALE/Pong-v5"
-    max_epochs = 200
-    gamma = 0.99
-
+    total_timesteps = 10_000_000
     n_envs = 8
     n_steps = 128
-
-    batch_size = 256
-    v_loss_coef = 0.5
-    entropy_coef = 0.01
-
-    epsilon = 0.2
+    num_minibatches = 4
+    update_epochs = 4
     lr = 2.5e-4
-    writer = SummaryWriter("runs/no_attention/" + str(time.time()))
+    gamma = 0.99
+    gae_lambda = 0.95
+    clip_coef = 0.1
+    ent_coef = 0.01
+    vf_coef = 0.5
+    max_grad_norm = 0.5
+    anneal_lr = True
+
+    writer = SummaryWriter(f"runs/ppo_pong/{time.time()}")
     try:
         ppo = PPO(
             ENV,
-            max_epochs,
             n_envs,
             n_steps,
-            batch_size,
+            num_minibatches,
+            total_timesteps,
             writer,
+            clip_coef=clip_coef,
+            gamma=gamma,
+            gae_lambda=gae_lambda,
+            vf_coef=vf_coef,
+            ent_coef=ent_coef,
+            max_grad_norm=max_grad_norm,
             lr=lr,
-            v_loss_coef=v_loss_coef,
-            entropy_coef=entropy_coef,
-            epsilon=epsilon,
+            update_epochs=update_epochs,
+            anneal_lr=anneal_lr,
         )
         ppo.train()
     except KeyboardInterrupt:

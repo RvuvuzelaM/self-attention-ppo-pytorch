@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Self-Attention PPO (Proximal Policy Optimization) implementation in PyTorch, inspired by [Attentive Multi-Task Deep Reinforcement Learning](https://arxiv.org/pdf/1904.03367.pdf). Trains an agent to play Atari games (default: ALE/Pong-v5) using PPO with a self-attention mechanism inserted into the CNN feature extractor.
+PPO (Proximal Policy Optimization) implementation in PyTorch, based on [CleanRL's ppo_atari.py](https://github.com/vwxyzjn/cleanrl). Trains an agent to play Atari games (default: ALE/Pong-v5) using PPO with a standard CNN feature extractor.
 
 ## Commands
 
@@ -29,21 +29,19 @@ ruff check .
 **Entry point:** `main.py` — configures hyperparameters and launches PPO training with TensorBoard logging to `runs/`.
 
 **`src/model.py`** — Neural network with shared CNN backbone for actor-critic:
-- `ActorCriticNet`: Conv layers → self-attention after first conv → linear layers → separate actor (policy logits) and critic (value) heads. Forward pass returns (logits, values, sampled actions).
-- `MultiHeadAttention` / `ScaledDotProductAttention`: Spatial self-attention using 1x1 convolutions for Q/K/V projections with residual connection. Applied to feature maps between conv layers.
+- `Agent`: Standard CNN (3 conv layers → flatten → linear 512) with orthogonal init. Separate actor and critic heads. API: `get_value(x)` and `get_action_and_value(x, action=None)`. Input is uint8, divided by 255 inside the model.
 
 **`src/ppo.py`** — PPO algorithm (`PPO` class):
-- `_rollout()`: Collects trajectories from parallel environments, computes GAE advantages and returns.
-- `_update()`: Runs multiple PPO epochs with minibatch updates (clipped surrogate objective + value loss + entropy bonus). Uses deep copy of model for old policy ratios.
-- `_test_env()`: Evaluates current policy on a single environment.
+- `train()`: Main training loop following CleanRL structure — rollout collection with pre-allocated buffers, GAE computation, flattened minibatch PPO updates with per-minibatch advantage normalization and value clipping using stored rollout values.
+- `_run_episode()`: Evaluates current policy on a single environment.
 - Saves best model checkpoint to `model.pt`.
 - Uses `gymnasium.vector.AsyncVectorEnv` for parallel environment execution.
 
-**`src/env_utils.py`** — Environment factory using gymnasium built-ins: `AtariPreprocessing` (frame skip, grayscale, resize to 84x84, scale to [0,1]) → `FrameStackObservation` (4 frames).
+**`src/env_utils.py`** — Environment factory: `RecordEpisodeStatistics` → `EpisodicLifeEnv` → `AtariPreprocessing` (frame skip, grayscale, resize to 84x84, uint8) → `ClipRewardWrapper` → `FrameStackObservation` (4 frames).
 
 ## Key Details
 
-- Observation shape after wrappers: `(4, 84, 84)` — 4 stacked grayscale frames
+- Observation shape after wrappers: `(4, 84, 84)` — 4 stacked grayscale frames (uint8, model normalizes to float internally)
 - No test suite exists in this project
 - Uses gymnasium API — `step()` returns 5 values (obs, reward, terminated, truncated, info)
 - Device auto-detected: CUDA → MPS → CPU

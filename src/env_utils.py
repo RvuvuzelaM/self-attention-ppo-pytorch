@@ -41,6 +41,7 @@ class ClipRewardWrapper(gym.RewardWrapper):
 
 def make_env_with_wrappers(env_name, render_mode=None):
     env = gym.make(env_name, frameskip=1, render_mode=render_mode)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
     env = EpisodicLifeEnv(env)
     env = AtariPreprocessing(
         env,
@@ -49,7 +50,7 @@ def make_env_with_wrappers(env_name, render_mode=None):
         screen_size=84,
         grayscale_obs=True,
         grayscale_newaxis=False,
-        scale_obs=True,
+        scale_obs=False,
     )
     env = ClipRewardWrapper(env)
     env = FrameStackObservation(env, stack_size=4)
