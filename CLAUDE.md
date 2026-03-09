@@ -9,9 +9,9 @@ Self-Attention PPO (Proximal Policy Optimization) implementation in PyTorch, ins
 ## Commands
 
 ```bash
-# Setup
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+# Setup (requires uv: https://docs.astral.sh/uv/)
+uv venv --python 3.12 && source .venv/bin/activate
+uv pip install -r requirements.txt
 
 # Train
 python main.py

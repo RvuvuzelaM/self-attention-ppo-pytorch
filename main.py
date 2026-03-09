@@ -9,16 +9,15 @@ if __name__ == "__main__":
     max_epochs = 200
     gamma = 0.99
 
-    n_envs = 64
-    n_steps = 512
+    n_envs = 8
+    n_steps = 128
 
-    batch_size = 64
+    batch_size = 256
     v_loss_coef = 0.5
-
-    max_grad_norm = 0.1
+    entropy_coef = 0.01
 
     epsilon = 0.2
-    lr = 3e-4
+    lr = 2.5e-4
     writer = SummaryWriter("runs/no_attention/" + str(time.time()))
     try:
         ppo = PPO(
@@ -30,7 +29,7 @@ if __name__ == "__main__":
             writer,
             lr=lr,
             v_loss_coef=v_loss_coef,
-            max_grad_norm=max_grad_norm,
+            entropy_coef=entropy_coef,
             epsilon=epsilon,
         )
         ppo.train()

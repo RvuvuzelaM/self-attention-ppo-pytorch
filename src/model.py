@@ -17,6 +17,17 @@ class ActorCriticNet(nn.Module):
         self.critic = nn.Linear(512, 1)
         self.actor = nn.Linear(512, ac_s)
 
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in [self.c1, self.c2, self.c3, self.l1]:
+            nn.init.orthogonal_(module.weight, gain=np.sqrt(2))
+            nn.init.constant_(module.bias, 0.0)
+        nn.init.orthogonal_(self.actor.weight, gain=0.01)
+        nn.init.constant_(self.actor.bias, 0.0)
+        nn.init.orthogonal_(self.critic.weight, gain=1.0)
+        nn.init.constant_(self.critic.bias, 0.0)
+
     def cnn_layer(self, x):
         h = F.relu(self.c1(x))
         h = self.attention_layer(h, h, h)
