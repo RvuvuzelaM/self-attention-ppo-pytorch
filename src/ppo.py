@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch import optim
 from gymnasium.vector import AsyncVectorEnv
 
-from .model import Agent
+from .models import make_agent
 from .env_utils import make_env_function, make_env_with_wrappers
 
 
@@ -34,12 +34,13 @@ class PPO:
         lr=2.5e-4,
         update_epochs=4,
         anneal_lr=True,
+        attention="none",
     ):
         self.envs = AsyncVectorEnv([make_env_function(env_name) for _ in range(n_envs)])
         self.eval_env = make_env_with_wrappers(env_name)
 
         self.device = _detect_device()
-        self.model = Agent(self.envs).to(self.device)
+        self.model = make_agent(self.envs, attention=attention).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr, eps=1e-5)
 
         self.writer = writer
@@ -105,7 +106,9 @@ class PPO:
                     action.cpu().numpy()
                 )
                 done = np.logical_or(terminated, truncated)
-                rewards[step] = torch.tensor(reward, dtype=torch.float32).to(self.device).view(-1)
+                rewards[step] = (
+                    torch.tensor(reward, dtype=torch.float32).to(self.device).view(-1)
+                )
                 next_obs = torch.Tensor(next_obs_np).to(self.device)
                 next_done = torch.Tensor(done).to(self.device)
 

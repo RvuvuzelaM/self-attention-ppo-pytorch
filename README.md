@@ -1,40 +1,51 @@
 ## Self-Attention PPO Pytorch
 
-I was inspired by [this paper](https://arxiv.org/pdf/1904.03367.pdf) which described few methods to approach for `Attention` for `Reinforcement Learning`.  
-I decided that it will be best to implement simplest one.
-
-This implementation don't have to be correct even though it works better than version without `Attention`.
+PPO implementation with selectable spatial self-attention variants for Atari, inspired by [Zambaldi et al.](https://arxiv.org/pdf/1904.03367.pdf). Compare plain CNN, single-head, and multi-head attention side-by-side.
 
 ## Setup
 
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 (`ale-py` doesn't ship wheels for 3.14 yet).
 
 ```bash
-uv venv --python 3.12 && source .venv/bin/activate
+uv venv --python 3.12
 uv pip install -r requirements.txt
 ```
 
 ## Train
 
 ```bash
-uv run main.py
+uv run python main.py --attention none     # plain CNN baseline
+uv run python main.py --attention single   # single-head spatial self-attention
+uv run python main.py --attention multi    # multi-head spatial self-attention (Zambaldi et al.)
 ```
+
+Each variant logs to its own TensorBoard directory under `runs/`.
 
 ## Watch a trained agent play
 
 After training, a `model.pt` checkpoint is saved automatically. To watch the agent play:
 
 ```bash
-uv run play.py              # play 3 games of Pong
-uv run play.py --games 5    # play 5 games
-uv run play.py --model best.pt  # use a different checkpoint
+uv run python play.py                              # plain CNN, 3 games
+uv run python play.py --attention multi --games 5  # multi-head model, 5 games
+uv run python play.py --model best.pt              # use a different checkpoint
 ```
 
-## Tensorboard
+## Compare runs with Tensorboard
 
 ```bash
 uv run tensorboard --logdir runs
 ```
+
+## Model variants
+
+| Flag | Architecture | Description |
+|------|-------------|-------------|
+| `--attention none` | Plain CNN | 3 conv layers → flatten → linear 512 (CleanRL baseline) |
+| `--attention single` | Single-head attention | conv1 → self-attention (1×1 Q/K/V + residual) → conv2 → conv3 |
+| `--attention multi` | Multi-head attention | conv1 → 4-head attention (Q/K/V + output proj + residual + LayerNorm) → conv2 → conv3 |
+
+Attention is applied after the first conv layer on the 20×20 spatial feature map (32 channels).
 
 ## Lint
 

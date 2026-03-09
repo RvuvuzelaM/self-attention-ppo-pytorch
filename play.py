@@ -4,6 +4,7 @@ Usage:
     python play.py                  # play 3 games of Pong
     python play.py --games 5        # play 5 games
     python play.py --model best.pt  # load a different checkpoint
+    python play.py --attention multi # use multi-head attention model
 """
 
 import argparse
@@ -11,7 +12,7 @@ import argparse
 import torch
 
 from src.env_utils import make_env_with_wrappers
-from src.model import Agent
+from src.models import make_agent
 
 
 def _detect_device():
@@ -29,11 +30,11 @@ class _SingleEnvShim:
         self.single_action_space = env.action_space
 
 
-def play(env_name, model_path, num_games):
+def play(env_name, model_path, num_games, attention):
     device = _detect_device()
     env = make_env_with_wrappers(env_name, render_mode="human")
 
-    model = Agent(_SingleEnvShim(env))
+    model = make_agent(_SingleEnvShim(env), attention=attention)
     model.load_state_dict(
         torch.load(model_path, map_location=device, weights_only=True)
     )
@@ -65,6 +66,12 @@ if __name__ == "__main__":
         "--model", default="model.pt", help="Path to saved model weights"
     )
     parser.add_argument("--games", type=int, default=3, help="Number of games to play")
+    parser.add_argument(
+        "--attention",
+        choices=["none", "single", "multi"],
+        default="none",
+        help="Attention variant used when training the model",
+    )
     args = parser.parse_args()
 
-    play(args.env, args.model, args.games)
+    play(args.env, args.model, args.games, args.attention)

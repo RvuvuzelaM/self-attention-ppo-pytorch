@@ -1,3 +1,4 @@
+import argparse
 import time
 
 from torch.utils.tensorboard import SummaryWriter
@@ -5,6 +6,15 @@ from torch.utils.tensorboard import SummaryWriter
 from src.ppo import PPO
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="PPO Atari training")
+    parser.add_argument(
+        "--attention",
+        choices=["none", "single", "multi"],
+        default="none",
+        help="Attention variant: none (plain CNN), single, or multi-head",
+    )
+    args = parser.parse_args()
+
     ENV = "ALE/Pong-v5"
     total_timesteps = 10_000_000
     n_envs = 8
@@ -20,7 +30,7 @@ if __name__ == "__main__":
     max_grad_norm = 0.5
     anneal_lr = True
 
-    writer = SummaryWriter(f"runs/ppo_pong/{time.time()}")
+    writer = SummaryWriter(f"runs/ppo_pong_{args.attention}/{time.time()}")
     try:
         ppo = PPO(
             ENV,
@@ -38,6 +48,7 @@ if __name__ == "__main__":
             lr=lr,
             update_epochs=update_epochs,
             anneal_lr=anneal_lr,
+            attention=args.attention,
         )
         ppo.train()
     except KeyboardInterrupt:
