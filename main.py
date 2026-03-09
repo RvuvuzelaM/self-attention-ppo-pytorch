@@ -5,7 +5,7 @@ from torch.utils.tensorboard import SummaryWriter
 from src.ppo import PPO
 
 if __name__ == "__main__":
-    ENV = "PongNoFrameskip-v4"
+    ENV = "ALE/Pong-v5"
     max_epochs = 200
     gamma = 0.99
 

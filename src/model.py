@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.distributions import Normal
 
 
 class ActorCriticNet(nn.Module):
@@ -27,7 +26,7 @@ class ActorCriticNet(nn.Module):
 
     def shared_layer(self, x):
         h = self.cnn_layer(x)
-        h = h.reshape(-1).view(-1, self.conv_out)
+        h = h.reshape(h.size(0), -1)
         h = F.relu(self.l1(h))
         return h
 
@@ -71,7 +70,8 @@ class ScaledDotProductAttention(nn.Module):
         super().__init__()
 
     def forward(self, q, k, v):
-        attn = torch.matmul(q, k.transpose(2, 3))
+        d_k = q.size(-1)
+        attn = torch.matmul(q, k.transpose(2, 3)) / (d_k**0.5)
+        attn = F.softmax(attn, dim=-1)
         output = torch.matmul(attn, v)
-
         return output

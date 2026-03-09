@@ -6,10 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from torch.distributions import Categorical
+from gymnasium.vector import AsyncVectorEnv
 
-from .multiprocess import SubprocVecEnv
 from .model import ActorCriticNet
-from .wrappers import make_env_function, make_env_with_wrappers
+from .env_utils import make_env_function, make_env_with_wrappers
 
 
 class PPO:
@@ -30,17 +30,23 @@ class PPO:
         lr=0.004,
         ppo_epochs=4,
     ):
-        self.envs = SubprocVecEnv([make_env_function(env_name) for _ in range(n_envs)])
+        self.envs = AsyncVectorEnv([make_env_function(env_name) for _ in range(n_envs)])
         self.env = make_env_with_wrappers(env_name)
 
-        self.obs_space = self.envs.observation_space.shape
-        action_space = self.envs.action_space.n
+        self.obs_space = self.envs.single_observation_space.shape
+        action_space = self.envs.single_action_space.n
         self.model = ActorCriticNet(self.obs_space, action_space)
-        self.device = "cuda:0" if torch.cuda.is_available() else "cpu:0"
+        if torch.cuda.is_available():
+            self.device = "cuda:0"
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
 
         self.writer = writer
+        self.env_name = env_name
 
         self.max_epochs = max_epochs
         self.n_envs = n_envs
@@ -93,7 +99,8 @@ class PPO:
         actions = np.zeros([self.n_steps, self.n_envs, 1], dtype=np.int32)
         values = np.zeros([self.n_steps + 1, self.n_envs, 1], dtype=np.float32)
 
-        states[0] = torch.from_numpy(self.envs.reset())
+        obs, _ = self.envs.reset()
+        states[0] = torch.from_numpy(obs)
         masks[0] = 0.0
 
         with torch.no_grad():
@@ -102,7 +109,10 @@ class PPO:
 
                 actions[t] = acts.to("cpu").numpy()
                 values[t] = vals.to("cpu").numpy()
-                states_np, rewards[t, :, 0], dones, _ = self.envs.step(actions[t])
+                states_np, rewards[t, :, 0], terminated, truncated, _ = self.envs.step(
+                    actions[t].squeeze()
+                )
+                dones = np.logical_or(terminated, truncated)
                 masks[t][dones] = 0
                 states[t + 1] = torch.from_numpy(states_np)
 
@@ -195,31 +205,37 @@ class PPO:
         del states, actions, rewards, advantages, returns, masks
 
     def _test_env(self):
-
-        state = self.env.reset()
+        state, _ = self.env.reset()
         done = False
         total_reward = 0
 
         while not done:
-            state = torch.FloatTensor(state).unsqueeze(0).to("cuda")
+            state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             _, _, action = self.model(state)
-            next_state, reward, done, _ = self.env.step(action.to("cpu"))
-
+            next_state, reward, terminated, truncated, _ = self.env.step(
+                action.to("cpu").item()
+            )
+            done = terminated or truncated
             state = next_state
             total_reward += reward
 
         return total_reward
 
     def eval(self, num_of_games):
-        for _ in range(num_of_games):
-            self.model.load_state_dict(torch.load("model.pt"))
-            self.model.eval()
+        eval_env = make_env_with_wrappers(self.env_name, render_mode="human")
+        self.model.load_state_dict(torch.load("model.pt", weights_only=True))
+        self.model.eval()
 
-            state = self.env.reset()
+        for _ in range(num_of_games):
+            state, _ = eval_env.reset()
             done = False
 
             while not done:
-                state = torch.FloatTensor(state).unsqueeze(0).to("cuda")
-                action = self.model.act(state).to("cpu")
-                self.env.render(mode="human")
-                state, _, done, _ = self.env.step(action)
+                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+                _, _, action = self.model(state)
+                state, _, terminated, truncated, _ = eval_env.step(
+                    action.to("cpu").item()
+                )
+                done = terminated or truncated
+
+        eval_env.close()
