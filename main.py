@@ -13,6 +13,12 @@ if __name__ == "__main__":
         default="none",
         help="Attention variant: none (plain CNN), single, or multi-head",
     )
+    parser.add_argument(
+        "--action-repeat",
+        type=int,
+        default=2,
+        help="Repeat each action for N env steps (default: 2)",
+    )
     args = parser.parse_args()
 
     ENV = "ALE/Pong-v5"
@@ -49,6 +55,7 @@ if __name__ == "__main__":
             update_epochs=update_epochs,
             anneal_lr=anneal_lr,
             attention=args.attention,
+            action_repeat=args.action_repeat,
         )
         ppo.train()
     except KeyboardInterrupt:

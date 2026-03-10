@@ -39,7 +39,25 @@ class ClipRewardWrapper(gym.RewardWrapper):
         return np.sign(reward)
 
 
-def make_env_with_wrappers(env_name, render_mode=None):
+class ActionRepeatWrapper(gym.Wrapper):
+    """Repeat the chosen action for *repeat* environment steps,
+    accumulating reward and stopping early on episode end."""
+
+    def __init__(self, env, repeat=1):
+        super().__init__(env)
+        self.repeat = repeat
+
+    def step(self, action):
+        total_reward = 0.0
+        for _ in range(self.repeat):
+            obs, reward, terminated, truncated, info = self.env.step(action)
+            total_reward += reward
+            if terminated or truncated:
+                break
+        return obs, total_reward, terminated, truncated, info
+
+
+def make_env_with_wrappers(env_name, render_mode=None, action_repeat=1):
     env = gym.make(env_name, frameskip=1, render_mode=render_mode)
     env = gym.wrappers.RecordEpisodeStatistics(env)
     env = EpisodicLifeEnv(env)
@@ -54,11 +72,13 @@ def make_env_with_wrappers(env_name, render_mode=None):
     )
     env = ClipRewardWrapper(env)
     env = FrameStackObservation(env, stack_size=4)
+    if action_repeat > 1:
+        env = ActionRepeatWrapper(env, repeat=action_repeat)
     return env
 
 
-def make_env_function(env_name):
+def make_env_function(env_name, action_repeat=1):
     def _thunk():
-        return make_env_with_wrappers(env_name)
+        return make_env_with_wrappers(env_name, action_repeat=action_repeat)
 
     return _thunk

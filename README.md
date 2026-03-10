@@ -29,7 +29,10 @@ After training, a `model.pt` checkpoint is saved automatically. To watch the age
 uv run python play.py                              # plain CNN, 3 games
 uv run python play.py --attention multi --games 5  # multi-head model, 5 games
 uv run python play.py --model best.pt              # use a different checkpoint
+uv run python play.py --action-repeat 8            # hold each action for 8 frames (calmer play)
 ```
+
+By default `--action-repeat 4` is used — the agent holds each action for 4 frames before choosing a new one, reducing jittery micro-movements. Set to `1` for original per-frame behaviour.
 
 ## Compare runs with Tensorboard
 
@@ -45,7 +48,7 @@ uv run tensorboard --logdir runs
 | `--attention single` | Single-head attention | conv1 → self-attention (1×1 Q/K/V + residual) → conv2 → conv3 |
 | `--attention multi` | Multi-head attention | conv1 → 4-head attention (Q/K/V + output proj + residual + LayerNorm) → conv2 → conv3 |
 
-Attention is applied after the first conv layer on the 20×20 spatial feature map (32 channels).
+Attention (single/multi) is applied after the first conv layer on the 20×20 spatial feature map (32 channels). 
 
 ## Lint
 

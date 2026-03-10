@@ -35,9 +35,12 @@ class PPO:
         update_epochs=4,
         anneal_lr=True,
         attention="none",
+        action_repeat=1,
     ):
-        self.envs = AsyncVectorEnv([make_env_function(env_name) for _ in range(n_envs)])
-        self.eval_env = make_env_with_wrappers(env_name)
+        self.envs = AsyncVectorEnv(
+            [make_env_function(env_name, action_repeat=action_repeat) for _ in range(n_envs)]
+        )
+        self.eval_env = make_env_with_wrappers(env_name, action_repeat=action_repeat)
 
         self.device = _detect_device()
         self.model = make_agent(self.envs, attention=attention).to(self.device)

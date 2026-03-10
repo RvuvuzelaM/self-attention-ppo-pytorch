@@ -1,15 +1,15 @@
 """Watch a trained agent play Pong (or another Atari game).
 
 Usage:
-    python play.py                  # play 3 games of Pong
-    python play.py --games 5        # play 5 games
-    python play.py --model best.pt  # load a different checkpoint
-    python play.py --attention multi # use multi-head attention model
+    python play.py
+    python play.py --games 5
+    python play.py --model best.pt
+    python play.py --attention multi
 """
 
 import argparse
+import time
 
-import pygame
 import torch
 
 from src.env_utils import make_env_with_wrappers
@@ -31,9 +31,14 @@ class _SingleEnvShim:
         self.single_action_space = env.action_space
 
 
-def play(env_name, model_path, num_games, attention, scale, fps):
+def play(env_name, model_path, num_games, attention, action_repeat):
     device = _detect_device()
-    env = make_env_with_wrappers(env_name, render_mode="rgb_array")
+
+    env = make_env_with_wrappers(
+        env_name,
+        render_mode="human",
+        action_repeat=action_repeat,
+    )
 
     model = make_agent(_SingleEnvShim(env), attention=attention)
     model.load_state_dict(
@@ -42,46 +47,30 @@ def play(env_name, model_path, num_games, attention, scale, fps):
     model.to(device)
     model.eval()
 
-    pygame.init()
-    screen = None
-    clock = pygame.time.Clock()
+    try:
+        for game in range(1, num_games + 1):
+            state, _ = env.reset()
+            done = False
+            total_reward = 0.0
 
-    for game in range(1, num_games + 1):
-        state, _ = env.reset()
-        frame = env.render()
-        if screen is None:
-            h, w = frame.shape[:2]
-            screen = pygame.display.set_mode((w * scale, h * scale))
-            pygame.display.set_caption(f"PPO Agent — {env_name}")
+            while not done:
+                state_t = torch.as_tensor(
+                    state, dtype=torch.float32, device=device
+                ).unsqueeze(0)
 
-        done = False
-        total_reward = 0
+                with torch.no_grad():
+                    action, _, _, _ = model.get_action_and_value(state_t)
 
-        while not done:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    env.close()
-                    pygame.quit()
-                    return
+                state, reward, terminated, truncated, _ = env.step(action.item())
+                done = terminated or truncated
+                total_reward += reward
 
-            state_t = torch.Tensor(state).unsqueeze(0).to(device)
-            with torch.no_grad():
-                action, _, _, _ = model.get_action_and_value(state_t)
-            state, reward, terminated, truncated, _ = env.step(action.cpu().item())
-            done = terminated or truncated
-            total_reward += reward
+            print(f"Game {game}: reward = {total_reward}")
 
-            frame = env.render()
-            surf = pygame.surfarray.make_surface(frame.transpose(1, 0, 2))
-            surf = pygame.transform.scale(surf, (w * scale, h * scale))
-            screen.blit(surf, (0, 0))
-            pygame.display.flip()
-            clock.tick(fps)
-
-        print(f"Game {game}: reward = {total_reward}")
-
-    env.close()
-    pygame.quit()
+            if game < num_games:
+                time.sleep(1.0)
+    finally:
+        env.close()
 
 
 if __name__ == "__main__":
@@ -98,11 +87,23 @@ if __name__ == "__main__":
         help="Attention variant used when training the model",
     )
     parser.add_argument(
-        "--scale", type=int, default=4, help="Window scale factor (default: 4)"
+        "--action-repeat",
+        type=int,
+        default=4,
+        help="Hold each action for N frames before choosing a new one (default: 4)",
     )
-    parser.add_argument(
-        "--fps", type=int, default=24, help="Playback speed in FPS (default: 24)"
-    )
+
+    # Kept only so old commands like `--fps 30` or `--scale 4` do not crash.
+    # These are ignored in human-render mode.
+    parser.add_argument("--fps", type=int, default=30, help=argparse.SUPPRESS)
+    parser.add_argument("--scale", type=int, default=4, help=argparse.SUPPRESS)
+
     args = parser.parse_args()
 
-    play(args.env, args.model, args.games, args.attention, args.scale, args.fps)
+    play(
+        args.env,
+        args.model,
+        args.games,
+        args.attention,
+        args.action_repeat,
+    )
